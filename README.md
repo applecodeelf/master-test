@@ -53,8 +53,17 @@ still awkward. PocketOrigin aims to make "phone as server" practical.
 - Backup and restore
 - Plugin API
 
+## Public Test Run
+
+```sh
+cd /sdcard/codexfiles/master-test
+sh scripts/start_public_panel.sh
+sh scripts/start_tunnel.sh
+```
+
+See [RUNBOOK.md](RUNBOOK.md) for restart, tunnel URL, and stop commands.
+
 ## Safety
 
 Do not expose sensitive services without authentication. Public internet tunnels
 can expose your phone to the internet.
-
