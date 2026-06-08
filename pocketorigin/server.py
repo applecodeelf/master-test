@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
+import base64
 import json
 import os
 import signal
@@ -213,8 +214,38 @@ def text_response(handler, text, status=200):
     handler.wfile.write(body)
 
 
+def auth_password():
+    return os.environ.get("POCKETORIGIN_PASSWORD", "")
+
+
+def auth_ok(header):
+    password = auth_password()
+    if not password:
+        return True
+    if not header or not header.startswith("Basic "):
+        return False
+    try:
+        decoded = base64.b64decode(header.split(" ", 1)[1]).decode("utf-8")
+    except Exception:
+        return False
+    if ":" not in decoded:
+        return False
+    username, supplied = decoded.split(":", 1)
+    return username == "pocket" and supplied == password
+
+
+def require_auth(handler):
+    handler.send_response(401)
+    handler.send_header("WWW-Authenticate", 'Basic realm="PocketOrigin"')
+    handler.send_header("Content-Type", "text/plain; charset=utf-8")
+    handler.end_headers()
+    handler.wfile.write(b"authentication required")
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if not auth_ok(self.headers.get("Authorization")):
+            return require_auth(self)
         parsed = urlparse(self.path)
         if parsed.path == "/":
             return self.serve_file(WEB / "index.html", "text/html; charset=utf-8")
@@ -238,6 +269,8 @@ class Handler(BaseHTTPRequestHandler):
         return text_response(self, "not found", 404)
 
     def do_POST(self):
+        if not auth_ok(self.headers.get("Authorization")):
+            return require_auth(self)
         parsed = urlparse(self.path)
         parts = parsed.path.strip("/").split("/")
         if len(parts) == 4 and parts[:2] == ["api", "services"]:
