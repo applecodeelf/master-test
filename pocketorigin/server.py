@@ -315,11 +315,25 @@ class Handler(BaseHTTPRequestHandler):
         print("%s - %s" % (self.address_string(), fmt % args), flush=True)
 
 
+class IPv6HTTPServer(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        except OSError:
+            pass
+        super().server_bind()
+
+
 def main():
     ensure_state()
     port = int(os.environ.get("POCKETORIGIN_PORT", "7860"))
     host = os.environ.get("POCKETORIGIN_HOST", "0.0.0.0")
-    server = ThreadingHTTPServer((host, port), Handler)
+    if ":" in host:
+        server = IPv6HTTPServer((host, port), Handler)
+    else:
+        server = ThreadingHTTPServer((host, port), Handler)
     print(f"PocketOrigin listening on http://{host}:{port}", flush=True)
     server.serve_forever()
 

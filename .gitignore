@@ -3,4 +3,4 @@ __pycache__/
 .pocketorigin/
 *.log
 server.pid
-
+PUBLIC_PASSWORD.txt
