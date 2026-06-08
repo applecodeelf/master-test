@@ -13,14 +13,28 @@ function metric(label, value) {
   return `<div class="metric"><strong>${value}</strong><span>${label}</span></div>`;
 }
 
+function addressUrl(item) {
+  if (item.family === "inet6") return `http://[${item.address}]:7860`;
+  return `http://${item.address}:7860`;
+}
+
 async function loadStatus() {
   const data = await api("/api/status");
+  const addressLinks = (data.addresses || []).map(item => {
+    const url = addressUrl(item);
+    return `<a href="${url}" target="_blank">${item.scope}: ${url}</a>`;
+  });
+  if (data.tunnel_url) {
+    addressLinks.unshift(`<a href="${data.tunnel_url}" target="_blank">public tunnel: ${data.tunnel_url}</a>`);
+  }
+
   metrics.innerHTML = [
     metric("Battery", data.battery),
     metric("Storage free", data.storage_free),
     metric("Memory free", data.memory_free),
     metric("Uptime", data.uptime),
     metric("Host", data.host),
+    `<div class="metric wide"><strong>Access URLs</strong><div class="links">${addressLinks.join("") || "No address detected"}</div></div>`,
   ].join("");
 }
 
@@ -73,4 +87,3 @@ async function loadAll() {
 refresh.addEventListener("click", loadAll);
 loadAll();
 setInterval(loadAll, 5000);
-

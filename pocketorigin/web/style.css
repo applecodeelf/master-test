@@ -76,6 +76,22 @@ button.danger { background: #3b1215; border-color: #7d2228; }
 
 .metric span, .service .meta { color: var(--muted); font-size: 13px; }
 
+.metric.wide {
+  grid-column: 1 / -1;
+}
+
+.links {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.links a {
+  color: var(--accent);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .services {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -118,4 +134,3 @@ pre {
   padding: 14px;
   color: #c9d1d9;
 }
-

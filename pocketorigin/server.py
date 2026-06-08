@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 import base64
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -196,6 +197,110 @@ def host_name():
         return "android"
 
 
+def network_addresses():
+    addresses = []
+    seen = set()
+    try:
+        result = subprocess.run(
+            ["ip", "-o", "addr", "show"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except OSError:
+        result = None
+
+    if result and result.stdout:
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 4 or parts[2] not in {"inet", "inet6"}:
+                continue
+            add_address(addresses, seen, parts[1], parts[2], parts[3].split("/", 1)[0])
+
+    if not any(item["family"] == "inet" for item in addresses):
+        parse_ifconfig_ipv4(addresses, seen)
+
+    parse_proc_ipv6(addresses, seen)
+    return addresses
+
+
+def add_address(addresses, seen, iface, family, value):
+    if value.startswith("127.") or value == "::1":
+        return
+    key = (family, value)
+    if key in seen:
+        return
+    seen.add(key)
+    scope = "lan"
+    if family == "inet6":
+        if value.startswith("fe80:"):
+            scope = "link-local"
+        else:
+            scope = "public-ipv6"
+    addresses.append({
+        "interface": iface,
+        "family": family,
+        "address": value,
+        "scope": scope,
+    })
+
+
+def parse_ifconfig_ipv4(addresses, seen):
+    try:
+        result = subprocess.run(
+            ["ifconfig"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except OSError:
+        return
+    current_iface = ""
+    for raw in result.stdout.splitlines():
+        if raw and not raw.startswith(" ") and ":" in raw:
+            current_iface = raw.split(":", 1)[0]
+        line = raw.strip()
+        if line.startswith("inet "):
+            parts = line.split()
+            if len(parts) >= 2:
+                add_address(addresses, seen, current_iface, "inet", parts[1])
+
+
+def parse_proc_ipv6(addresses, seen):
+    path = Path("/proc/net/if_inet6")
+    try:
+        if not path.exists():
+            return
+        lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        parts = line.split()
+        if len(parts) != 6:
+            continue
+        raw, _index, _prefix, scope, _flags, iface = parts
+        groups = [raw[i:i + 4] for i in range(0, 32, 4)]
+        value = ":".join(groups)
+        try:
+            value = socket.inet_ntop(socket.AF_INET6, bytes.fromhex(raw))
+        except OSError:
+            pass
+        if scope.lower() == "20":
+            value = value + "%" + iface
+        add_address(addresses, seen, iface, "inet6", value)
+
+
+def latest_tunnel_url():
+    tunnel_log = STATE_DIR / "tunnel.log"
+    if not tunnel_log.exists():
+        return ""
+    text = tunnel_log.read_text(encoding="utf-8", errors="ignore")
+    matches = re.findall(r"https://[A-Za-z0-9.-]+\.lhr\.life", text)
+    return matches[-1] if matches else ""
+
+
 def json_response(handler, payload, status=200):
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     handler.send_response(status)
@@ -260,6 +365,8 @@ class Handler(BaseHTTPRequestHandler):
                 "memory_free": memory_free(),
                 "uptime": uptime(),
                 "host": host_name(),
+                "addresses": network_addresses(),
+                "tunnel_url": latest_tunnel_url(),
             })
         if parsed.path == "/api/services":
             return json_response(self, {"services": self.service_list()})
