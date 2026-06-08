@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PocketOrigin</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>PocketOrigin</h1>
+      <p>Android phone server control panel</p>
+    </div>
+    <button id="refresh">Refresh</button>
+  </header>
+
+  <main>
+    <section class="metrics" id="metrics"></section>
+
+    <section>
+      <h2>Services</h2>
+      <div id="services" class="services"></div>
+    </section>
+
+    <section>
+      <h2>Log</h2>
+      <pre id="log">Select a service log.</pre>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
